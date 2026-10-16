@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>50音コミュニケーター</title>
+<style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+html, body {
+  width:100%; height:100%;
+  background:#111;
+  color:#fff;
+  font-family:'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+  overflow:hidden;
+  user-select:none;
+  -webkit-user-select:none;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+
+/* ===== 開始画面 ===== */
+#start {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  height:100%;
+  gap:24px;
+  text-align:center;
+  padding:20px;
+}
+#start .t1 { font-size:clamp(1.2rem,4vw,2rem); color:#aaa; }
+#start .t2 {
+  font-size:clamp(3rem,12vw,6rem);
+  font-weight:bold;
+  animation:pulse 1.4s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ===== メイン画面 ===== */
+#main {
+  display:none;
+  flex-direction:column;
+  height:100%;
+}
+
+/* 入力済みテキスト */
+#output {
+  background:#1a1a1a;
+  padding:14px 24px;
+  font-size:clamp(2rem,7vw,4rem);
+  min-height:74px;
+  border-bottom:2px solid #2a2a2a;
+  letter-spacing:.12em;
+  word-break:break-all;
+  flex-shrink:0;
+}
+
+/* 現在読んでいる文字（メイン表示） */
+#current-wrap {
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+}
+#current {
+  font-size:clamp(7rem,30vw,20rem);
+  font-weight:bold;
+  line-height:1;
+  text-align:center;
+  transition:color .12s;
+}
+#current.flash { color:#4fc3f7; }
+
+/* 状態インジケーター */
+#indicator {
+  margin-top:16px;
+  font-size:clamp(.9rem,3vw,1.4rem);
+  color:#555;
+  letter-spacing:.1em;
+}
+
+/* 操作ガイド */
+#guide {
+  background:#1a1a1a;
+  padding:10px 24px;
+  font-size:clamp(.75rem,2.2vw,1rem);
+  color:#555;
+  text-align:center;
+  border-top:2px solid #2a2a2a;
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+/* 設定ボタン */
+#cfg-btn {
+  background:#2a2a2a;
+  border:1px solid #444;
+  color:#aaa;
+  padding:6px 14px;
+  border-radius:6px;
+  font-size:.85rem;
+  cursor:pointer;
+  white-space:nowrap;
+  flex-shrink:0;
+}
+#cfg-btn:hover { background:#3a3a3a; }
+
+/* 設定パネル */
+#cfg-panel {
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.85);
+  z-index:100;
+  align-items:center;
+  justify-content:center;
+}
+#cfg-panel.open { display:flex; }
+#cfg-box {
+  background:#1e1e1e;
+  border:1px solid #444;
+  border-radius:12px;
+  padding:28px 32px;
+  width:min(460px,90vw);
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+}
+#cfg-box h2 { font-size:1.1rem; color:#ccc; margin-bottom:4px; }
+.cfg-row { display:flex; flex-direction:column; gap:6px; }
+.cfg-row label { font-size:.82rem; color:#888; }
+.cfg-row input[type=range] { width:100%; accent-color:#4fc3f7; }
+.cfg-row select {
+  background:#111; color:#ddd; border:1px solid #444;
+  padding:7px 10px; border-radius:6px; font-size:.88rem; width:100%;
+}
+.cfg-val { font-size:.82rem; color:#4fc3f7; }
+#cfg-close {
+  margin-top:4px;
+  background:#4fc3f7; color:#000; border:none;
+  padding:10px; border-radius:8px; font-size:.95rem; font-weight:700; cursor:pointer;
+}
+#cfg-close:hover { background:#7dd6f0; }
+</style>
+</head>
+<body>
+
+<!-- 開始画面 -->
+<div id="start">
+  <div class="t1">50音コミュニケーター</div>
+  <div class="t2">クリックして開始</div>
+</div>
+
+<!-- メイン画面 -->
+<div id="main">
+  <div id="output">　</div>
+  <div id="current-wrap">
+    <div id="current">　</div>
+    <div id="indicator">　</div>
+  </div>
+  <div id="guide">
+    <span>クリック：選択 ／ ダブル：やり直し ／ トリプル：一時停止</span>
+    <button id="cfg-btn" onclick="openCfg(event)">⚙ 設定</button>
+  </div>
+</div>
+
+<!-- 設定パネル -->
+<div id="cfg-panel">
+  <div id="cfg-box">
+    <h2>⚙ 設定</h2>
+    <div class="cfg-row">
+      <label>待機時間（読み上げ後の間隔）<span class="cfg-val" id="v-pause"></span></label>
+      <input type="range" id="s-pause" min="0" max="5000" step="500">
+    </div>
+    <div class="cfg-row">
+      <label>読み上げ速度<span class="cfg-val" id="v-rate"></span></label>
+      <input type="range" id="s-rate" min="30" max="400" step="10">
+    </div>
+    <button id="cfg-close" onclick="closeCfg(event)">閉じる</button>
+  </div>
+</div>
+
+<script>
+// ===== 設定 =====
+var PAUSE_MS     = 1500;
+var SPEECH_RATE  = 0.88;
+var SPEAK_MAX_MS = 5000;
+var selVoice     = null;
+var genId        = 0;
+function loadVoices() {
+  var list = speechSynthesis.getVoices().filter(function(v){
+    return v.lang.indexOf('ja') === 0 && v.name.indexOf('Natural') >= 0;
+  });
+  if (list.length === 0) return;
+  if (!selVoice) {
+    selVoice = list.find(function(v){ return v.name.toLowerCase().indexOf('nanami') >= 0; }) || list[0];
+  }
+}
+
+speechSynthesis.onvoiceschanged = loadVoices;
+loadVoices();
+
+function openCfg(e) {
+  e.stopPropagation();
+  genId++;
+  speechSynthesis.cancel();
+  clearTimeout(scanTimer);
+  clearTimeout(tapTimer);
+  scanTimer = null;
+  var sp = document.getElementById('s-pause');
+  var sr = document.getElementById('s-rate');
+  sp.value = PAUSE_MS;
+  sr.value = Math.round(SPEECH_RATE * 100);
+  document.getElementById('v-pause').textContent = ' — ' + (PAUSE_MS/1000).toFixed(1) + '秒';
+  document.getElementById('v-rate').textContent  = ' — ' + Math.round(SPEECH_RATE * 100) + '%';
+  sp.oninput = function(){ PAUSE_MS = parseInt(sp.value); document.getElementById('v-pause').textContent = ' — '+(PAUSE_MS/1000).toFixed(1)+'秒'; };
+  sr.oninput = function(){ SPEECH_RATE = parseInt(sr.value)/100; document.getElementById('v-rate').textContent = ' — '+Math.round(SPEECH_RATE*100)+'%'; };
+  document.getElementById('cfg-panel').classList.add('open');
+}
+
+function closeCfg(e) {
+  e.stopPropagation();
+  document.getElementById('cfg-panel').classList.remove('open');
+  if (started) {
+    if (phase === 'rows') doScanRow();
+    else doScanKana();
+  }
+}
+
+// ===== 50音データ =====
+var ROWS = [
+  { label:'あ', kana:['あ','い','う','え','お'] },
+  { label:'か', kana:['か','き','く','け','こ','が','ぎ','ぐ','げ','ご'] },
+  { label:'さ', kana:['さ','し','す','せ','そ','ざ','じ','ず','ぜ','ぞ'] },
+  { label:'た', kana:['た','ち','つ','て','と','だ','ぢ','づ','で','ど'] },
+  { label:'な', kana:['な','に','ぬ','ね','の'] },
+  { label:'は', kana:['は','ひ','ふ','へ','ほ','ば','び','ぶ','べ','ぼ','ぱ','ぴ','ぷ','ぺ','ぽ'] },
+  { label:'ま', kana:['ま','み','む','め','も'] },
+  { label:'や', kana:['や','ゆ','よ'] },
+  { label:'ら', kana:['ら','り','る','れ','ろ'] },
+  { label:'わ', kana:['わ','を','ん'] },
+];
+
+// ===== 状態 =====
+var phase   = 'start';
+var rowIdx  = 0;
+var kanaIdx = 0;
+var curRow  = null;
+var text    = '';
+var started = false;
+var paused  = false;
+var scanTimer = null;
+var tapCount  = 0;
+var tapTimer  = null;
+var lastActivity = 0;
+
+// ===== 音声 =====
+function speak(str, cb) {
+  clearTimeout(scanTimer);
+  scanTimer = null;
+  speechSynthesis.cancel();
+  lastActivity = Date.now();
+  var myGen = ++genId;
+  var u     = new SpeechSynthesisUtterance(str);
+  u.lang    = 'ja-JP';
+  u.rate    = SPEECH_RATE;
+  u.pitch   = 1.0;
+  if (selVoice) u.voice = selVoice;
+  var fired = false;
+  // 壊れた音声がonendを発火しない場合でも必ず次へ進む
+  var guard = setTimeout(function() {
+    if (genId === myGen && !fired) {
+      fired = true;
+      speechSynthesis.cancel();
+      if (cb) cb();
+    }
+  }, Math.max(SPEAK_MAX_MS, str.length * 800));
+  u.onend = function() {
+    clearTimeout(guard);
+    lastActivity = Date.now();
+    if (genId === myGen && !fired) {
+      fired = true;
+      if (cb) cb();
+    }
+  };
+  speechSynthesis.speak(u);
+}
+
+// グローバルウォッチドッグ（止まったら再開）
+setInterval(function(){
+  if (!started || paused) return;
+  if (speechSynthesis.speaking) { lastActivity = Date.now(); return; }
+  if (scanTimer) return;
+  if (Date.now() - lastActivity < 2000) return;
+  lastActivity = Date.now();
+  if (phase === 'rows') doScanRow();
+  else if (phase === 'kana') doScanKana();
+}, 1000);
+
+// ===== 表示 =====
+function showCurrent(txt, sub) {
+  var el = document.getElementById('current');
+  el.textContent = txt;
+  el.classList.add('flash');
+  setTimeout(function(){ el.classList.remove('flash'); }, 150);
+  document.getElementById('indicator').textContent = sub || '　';
+}
+function showOutput() {
+  document.getElementById('output').textContent = text || '　';
+}
+
+// ===== スキャン =====
+function scheduleNext() {
+  scanTimer = setTimeout(advance, PAUSE_MS);
+  lastActivity = Date.now();
+}
+
+function advance() {
+  scanTimer = null;
+  if (phase === 'rows') {
+    var next = (rowIdx + 1) % ROWS.length;
+    var looped = (next === 0);
+    rowIdx = next;
+    if (looped && text) {
+      var t = text;
+      text = '';
+      showOutput();
+      speak(t, function(){ doScanRow(); });
+    } else {
+      doScanRow();
+    }
+  } else if (phase === 'kana') {
+    var ni = kanaIdx + 1;
+    if (ni >= curRow.kana.length) {
+      phase = 'rows';
+      doScanRow();
+    } else {
+      kanaIdx = ni;
+      doScanKana();
+    }
+  }
+}
+
+function doScanRow() {
+  var row = ROWS[rowIdx];
+  showCurrent(row.label, '');
+  speak(row.label, function(){ scheduleNext(); });
+}
+
+function doScanKana() {
+  var k = curRow.kana[kanaIdx];
+  showCurrent(k, curRow.label);
+  speak(k, function(){ scheduleNext(); });
+}
+
+// ===== 選択 =====
+function doSelect() {
+  clearTimeout(scanTimer);
+  scanTimer = null;
+
+  if (phase === 'rows') {
+    var row = ROWS[rowIdx];
+    curRow  = row;
+    kanaIdx = 0;
+    phase   = 'kana';
+    doScanKana();
+
+  } else if (phase === 'kana') {
+    var k = curRow.kana[kanaIdx];
+    text += k;
+    showOutput();
+    phase  = 'rows';
+    rowIdx = 0;
+    speak(k, function(){ doScanRow(); });
+  }
+}
+
+function doReset() {
+  clearTimeout(scanTimer);
+  scanTimer = null;
+  phase  = 'rows';
+  rowIdx = 0;
+  kanaIdx = 0;
+  curRow  = null;
+  doScanRow();
+}
+
+// ===== タップ処理 =====
+function onTap() {
+  if (!started) {
+    started = true;
+    document.getElementById('start').style.display = 'none';
+    document.getElementById('main').style.display = 'flex';
+    phase = 'rows'; rowIdx = 0;
+    doScanRow();
+    return;
+  }
+
+  // 押した瞬間に止める
+  genId++;
+  speechSynthesis.cancel();
+  clearTimeout(scanTimer);
+  scanTimer = null;
+  lastActivity = Date.now();
+
+  tapCount++;
+  clearTimeout(tapTimer);
+  tapTimer = setTimeout(function(){
+    var n = tapCount;
+    tapCount = 0;
+    if (n >= 3) {
+      paused = !paused;
+      if (paused) { showCurrent('⏸', ''); }
+      else { doReset(); }
+    } else if (n === 2) {
+      if (paused) { paused = false; doReset(); }
+      else { doReset(); }
+    } else {
+      if (!paused) doSelect();
+    }
+  }, 250);
+}
+
+function isCfg(e) {
+  return e.target.closest('#cfg-btn') || e.target.closest('#cfg-panel');
+}
+document.addEventListener('click', function(e){ if (!isCfg(e)) onTap(); });
+document.addEventListener('touchend', function(e){ if (isCfg(e)) return; e.preventDefault(); onTap(); }, { passive:false });
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTap(); }
+});
+</script>
+</body>
+</html>

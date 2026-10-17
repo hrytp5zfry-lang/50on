@@ -440,6 +440,14 @@ document.addEventListener('touchend', function(e){ if (isCfg(e)) return; e.preve
 document.addEventListener('keydown', function(e){
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTap(); }
 });
+document.addEventListener('contextmenu', function(e){
+  e.preventDefault();
+  if (!started || isCfg(e)) return;
+  if (text.length > 0) {
+    text = text.slice(0, -1);
+    showOutput();
+  }
+});
 </script>
 </body>
 </html>

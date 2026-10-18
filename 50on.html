@@ -448,7 +448,7 @@ function doSelect() {
     curRow  = row;
     kanaIdx = 0;
     phase   = 'kana';
-    doScanKana();
+    scanTimer = setTimeout(doScanKana, 400);
 
   } else if (phase === 'kana') {
     var k = curRow.kana[kanaIdx];
